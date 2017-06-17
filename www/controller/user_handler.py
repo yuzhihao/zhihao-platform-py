@@ -13,11 +13,12 @@ import time
 from aiohttp import web
 
 import markdown2
-from apis import Page, APIValueError, APIResourceNotFoundError
+from apis import Page, APIValueError, APIResourceNotFoundError, APIError
 from conf.config import configs
 from coroweb import get, post
 from models import User, Comment, Blog, next_id
 from common import utils
+from common.json_utils import DateEncoder
 
 COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs['session']['secret']
@@ -39,7 +40,7 @@ def cookie2user(cookie_str):
         user = yield from User.find(uid)
         if user is None:
             return None
-        s = '%s-%s-%s-%s' % (uid, user.passwd, expires, _COOKIE_KEY)
+        s = '%s-%s-%s-%s' % (uid, user.password, expires, _COOKIE_KEY)
         if sha1 != hashlib.sha1(s.encode('utf-8')).hexdigest():
             logging.info('invalid sha1')
             return None
@@ -55,7 +56,7 @@ def user2cookie(user, max_age):
     '''
     # build cookie string by: id-expires-sha1
     expires = str(int(time.time() + max_age))
-    s = '%s-%s-%s-%s' % (user.id, user.passwd, expires, _COOKIE_KEY)
+    s = '%s-%s-%s-%s' % (user.id, user.password, expires, _COOKIE_KEY)
     L = [user.id, expires, hashlib.sha1(s.encode('utf-8')).hexdigest()]
     return '-'.join(L)
 
@@ -83,17 +84,17 @@ def authenticate(*, email, passwd):
     user = users[0]
     # check passwd:
     sha1 = hashlib.sha1()
-    sha1.update(user.id)
+    sha1.update(user.id.encode('utf-8'))
     sha1.update(b':')
     sha1.update(passwd.encode('utf-8'))
-    if user.passwd != sha1.hexdigest():
+    if user.password != sha1.hexdigest():
         raise APIValueError('passwd', 'Invalid password.')
     # authenticate ok, set cookie:
     r = web.Response()
     r.set_cookie(COOKIE_NAME, user2cookie(user, 86400), max_age=86400, httponly=True)
-    user.passwd = '******'
+    user.password = '******'
     r.content_type = 'application/json'
-    r.body = json.dumps(user, ensure_ascii=False).encode('utf-8')
+    r.body = json.dumps(user, ensure_ascii=False,cls=DateEncoder).encode('utf-8')
     return r
 
 @get('/signout')
@@ -112,7 +113,7 @@ def api_get_users(*, page='1'):
     p = Page(num, page_index)
     if num == 0:
         return dict(page=p, users=())
-    users = yield from User.findAll(orderBy='created_at desc', limit=(p.offset, p.limit))
+    users = yield from User.findAll(orderBy='registDate desc', limit=(p.offset, p.limit))
     for u in users:
         u.passwd = '******'
     return dict(page=p, users=users)
@@ -133,7 +134,7 @@ def api_register_user(*, email, name, passwd):
         raise APIError('register:failed', 'email', 'Email is already in use.')
     uid = next_id()
     sha1_passwd = '%s:%s' % (uid, passwd)
-    user = User(name=name.strip(), email=email, passwd=hashlib.sha1(sha1_passwd.encode('utf-8')).hexdigest(), image='http://www.gravatar.com/avatar/%s?d=mm&s=120' % hashlib.md5(email.encode('utf-8')).hexdigest())
+    user = User(id=uid, nickname=name.strip(), username=email, password=hashlib.sha1(sha1_passwd.encode('utf-8')).hexdigest(), image='http://www.gravatar.com/avatar/%s?d=mm&s=120' % hashlib.md5(email.encode('utf-8')).hexdigest())
     yield from user.save()
     # make session cookie:
     r = web.Response()

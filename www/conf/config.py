@@ -20,13 +20,13 @@ LOG_DIR = os.path.join(PROJECTDIR,'logs/')
 configs = {
     'debug': True,
     'db': {
-        'host': '112.74.89.67',
+        'host': '127.0.0.1',#'112.74.89.67',
         'port': 3306,
         'user': 'zhihao',
         'password': 'zhihao',
         'db': 'zhihaoyu'
     },
     'session': {
-        'secret': 'Awesome'
+        'secret': 'zhihaoyu'
     }
 }

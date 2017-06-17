@@ -17,10 +17,10 @@ def next_id():
 class User(Model):
     __table__ = 'user'
 
-    id = IntegerField(primary_key=True)
+    id = StringField(primary_key=True, default=next_id, ddl='varchar(50)')
     username = StringField(ddl='varchar(50)')
     password = StringField(ddl='varchar(50)')
-    #admin = BooleanField()
+    admin = BooleanField(default = True)
     nickname = StringField(ddl='varchar(50)')
     photopath = StringField(ddl='varchar(500)')
     registDate = DateField(default=utils.getDateStr())
@@ -35,15 +35,14 @@ class Blog(Model):
     title = StringField(ddl='varchar(50)')
     summary = StringField(ddl='varchar(200)')
     content = TextField()
-    createDate = FloatField(default=time.time)
+    createDate = DateField(default=utils.getDateStr())
 
 class Comment(Model):
     __table__ = 'comment'
-
     id = StringField(primary_key=True, default=next_id, ddl='varchar(50)')
     blog_id = StringField(ddl='varchar(50)')
     user_id = StringField(ddl='varchar(50)')
     user_name = StringField(ddl='varchar(50)')
     user_image = StringField(ddl='varchar(500)')
     content = TextField()
-    createDate = FloatField(default=time.time)
+    createDate = DateField(default=utils.getDateStr())

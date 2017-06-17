@@ -8,6 +8,8 @@ async web application.
 import logging;
 
 #from www import common
+from json import JSONEncoder
+
 logging.basicConfig(level=logging.INFO)
 import sys
 import asyncio, os, json, time
@@ -24,6 +26,7 @@ import orm
 from coroweb import add_routes, add_static
 
 from controller.user_handler import cookie2user, COOKIE_NAME
+from common.json_utils import DateEncoder
 
 def init_jinja2(app, **kw):
     logging.info('init jinja2...')
@@ -65,7 +68,7 @@ def auth_factory(app, handler):
         if cookie_str:
             user = yield from cookie2user(cookie_str)
             if user:
-                logging.info('set current user: %s' % user.email)
+                logging.info('set current user: %s' % user.username)
                 request.__user__ = user
         if request.path.startswith('/manage/') and (request.__user__ is None or not request.__user__.admin):
             return web.HTTPFound('/signin')
@@ -85,6 +88,8 @@ def data_factory(app, handler):
                 logging.info('request form: %s' % str(request.__data__))
         return (yield from handler(request))
     return parse_data
+
+
 
 @asyncio.coroutine
 def response_factory(app, handler):
@@ -107,7 +112,9 @@ def response_factory(app, handler):
         if isinstance(r, dict):
             template = r.get('__template__')
             if template is None:
-                resp = web.Response(body=json.dumps(r, ensure_ascii=False, default=lambda o: o.__dict__).encode('utf-8'))
+                #body = json.dumps(r, cls=DateEncoder, ensure_ascii=False, default=lambda o: o.__dict__)
+                #resp = web.Response(body.encode('utf-8'))
+                resp = web.Response(body=json.dumps(r, ensure_ascii=False,cls=DateEncoder).encode('utf-8'))
                 resp.content_type = 'application/json;charset=utf-8'
                 return resp
             else:
@@ -115,8 +122,8 @@ def response_factory(app, handler):
                 resp = web.Response(body=app['__templating__'].get_template(template).render(**r).encode('utf-8'))
                 resp.content_type = 'text/html;charset=utf-8'
                 return resp
-        if isinstance(r, int) and t >= 100 and t < 600:
-            return web.Response(t)
+        if isinstance(r, int) and r >= 100 and r < 600:
+            return web.Response(r)
         if isinstance(r, tuple) and len(r) == 2:
             t, m = r
             if isinstance(t, int) and t >= 100 and t < 600:
@@ -155,6 +162,7 @@ def init(loop):
     add_routes(app, 'handlers')
     add_routes(app, 'controller.user_handler')
     add_routes(app, 'controller.blog_handler')
+    add_routes(app, 'controller.comment_handler')
 
     add_static(app)
     srv = yield from loop.create_server(app.make_handler(), '127.0.0.1', 9000)
